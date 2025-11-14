@@ -163,55 +163,102 @@ class OSINTTools:
     @staticmethod
     def check_data_breaches(email):
         """
-        Check if email appears in known data breaches
-        Uses Have I Been Pwned API (this is REAL and LEGAL)
-        Note: Requires API key for full functionality
+        Check if email appears in REAL data breaches using LeakCheck.io API
+        This pulls LIVE breach data - 100% dynamic and real-time!
+        API Key: b6c0aba19e5763a15e2d5799f1e3dbeeb46aa1fa
         """
+        # LeakCheck.io API Configuration
+        LEAKCHECK_API_KEY = "b6c0aba19e5763a15e2d5799f1e3dbeeb46aa1fa"
+        
         breaches = {
             'email': email,
             'checked': True,
             'breaches_found': [],
-            'note': 'Using local breach database for demonstration'
+            'total_breaches': 0,
+            'risk_level': 'Unknown',
+            'source': 'LeakCheck.io API - Real-time breach database',
+            'note': ''
         }
         
-        # Simulated breach check (in real implementation, use HIBP API)
-        # Example: https://haveibeenpwned.com/api/v3/breachedaccount/{email}
-        
-        # Common breaches for demonstration
-        common_breaches = [
-            {
-                'name': 'LinkedIn',
-                'date': '2021-06-01',
-                'records': '700M users',
-                'data_exposed': 'Email addresses, names, phone numbers, workplace info',
-                'severity': 'High',
-                'recommendation': 'Change LinkedIn password immediately'
-            },
-            {
-                'name': 'Facebook',
-                'date': '2019-04-03',
-                'records': '533M users',
-                'data_exposed': 'Phone numbers, names, locations, email addresses',
-                'severity': 'High',
-                'recommendation': 'Enable two-factor authentication'
-            },
-            {
-                'name': 'Adobe',
-                'date': '2013-10-04',
-                'records': '153M users',
-                'data_exposed': 'Email addresses, passwords, password hints',
-                'severity': 'Critical',
-                'recommendation': 'Change all passwords using similar patterns'
+        try:
+            # LeakCheck.io Public API endpoint
+            url = "https://leakcheck.io/api/public"
+            headers = {
+                'X-API-Key': LEAKCHECK_API_KEY,
+                'Content-Type': 'application/json'
             }
-        ]
-        
-        # Simulate finding breaches (in real app, this would be API call)
-        # For demo, show breaches for emails containing certain keywords
-        if 'test' in email.lower() or len(email.split('@')[0]) > 5:
-            breaches['breaches_found'] = common_breaches[:2]
-        
-        breaches['total_breaches'] = len(breaches['breaches_found'])
-        breaches['risk_level'] = 'High' if breaches['total_breaches'] > 0 else 'Low'
+            params = {
+                'check': email,
+                'type': 'email'
+            }
+            
+            # Make REAL API request to LeakCheck
+            print(f"🔍 Checking breaches for {email} using LeakCheck.io...")
+            response = requests.get(url, headers=headers, params=params, timeout=15)
+            
+            print(f"📡 API Response Status: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                print(f"📊 API Response: {data}")
+                
+                # LeakCheck returns actual breach data
+                if data.get('success') and data.get('found', 0) > 0:
+                    sources = data.get('sources', [])
+                    
+                    print(f"⚠️ Found {len(sources)} breach sources!")
+                    
+                    for source in sources:
+                        # Extract breach information
+                        breach_info = {
+                            'name': source.get('name', 'Unknown Breach'),
+                            'date': source.get('date', 'Unknown Date'),
+                            'data_exposed': ', '.join(source.get('fields', [])) if source.get('fields') else 'Multiple fields',
+                            'severity': 'Critical' if len(source.get('fields', [])) > 5 else 'High',
+                            'recommendation': f"⚠️ Password compromised in {source.get('name', 'this breach')}! Change immediately and enable 2FA!",
+                            'source': 'LeakCheck.io (Live Data)'
+                        }
+                        breaches['breaches_found'].append(breach_info)
+                    
+                    breaches['total_breaches'] = data.get('found', len(sources))
+                    breaches['risk_level'] = 'Critical' if breaches['total_breaches'] > 3 else 'High'
+                    breaches['note'] = f"🚨 CRITICAL: Email found in {breaches['total_breaches']} REAL data breaches! (Live from LeakCheck.io)"
+                    
+                else:
+                    # No breaches found - GOOD NEWS!
+                    breaches['total_breaches'] = 0
+                    breaches['risk_level'] = 'Low'
+                    breaches['note'] = '✅ Excellent! Email not found in any known data breaches (Verified by LeakCheck.io)'
+                    print("✅ No breaches found - email is clean!")
+                    
+            elif response.status_code == 404:
+                # Email not found in breach database
+                breaches['total_breaches'] = 0
+                breaches['risk_level'] = 'Low'
+                breaches['note'] = '✅ Good news! Email not found in any data breaches'
+                print("✅ 404 - Email not in breach database")
+                
+            else:
+                # API error
+                breaches['note'] = f'⚠️ LeakCheck API returned status {response.status_code}. Try again later.'
+                breaches['risk_level'] = 'Unknown'
+                print(f"⚠️ API Error: Status {response.status_code}")
+                print(f"Response: {response.text}")
+                
+        except requests.exceptions.Timeout:
+            breaches['note'] = '⚠️ LeakCheck API timeout - service may be experiencing high load'
+            breaches['risk_level'] = 'Unknown'
+            print("⏱️ API Timeout")
+            
+        except requests.exceptions.ConnectionError:
+            breaches['note'] = '⚠️ Cannot connect to LeakCheck API - check internet connection'
+            breaches['risk_level'] = 'Unknown'
+            print("🔌 Connection Error")
+            
+        except Exception as e:
+            breaches['note'] = f'⚠️ Error checking breaches: {str(e)}'
+            breaches['risk_level'] = 'Unknown'
+            print(f"❌ Error: {str(e)}")
         
         return breaches
     
